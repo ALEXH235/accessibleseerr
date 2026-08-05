@@ -71,6 +71,15 @@ const REQUEST_STATUS_LABELS = Object.freeze({
 const MEDIA_STATUS_AVAILABLE = 5;
 const MEDIA_STATUS_UNKNOWN = 1;
 
+/**
+ * Opt-in diagnostic logging, enabled by loading the app with `?debug=1` in
+ * the URL. This never logs credentials, cookies, or full account payloads —
+ * only request methods/paths, response status codes, and the non-sensitive
+ * fields needed to debug why a request did or did not reach Seerr (and, in
+ * turn, Sonarr/Radarr). See debugLog() in the API helpers section.
+ */
+const DEBUG_LOGGING = new URLSearchParams(window.location.search).get("debug") === "1";
+
 /* ============================================================
    2. DOM references
    ============================================================ */
@@ -231,6 +240,47 @@ function extractApiMessage(body) {
 }
 
 /**
+ * Log a non-sensitive diagnostic message to the console when `?debug=1` is
+ * present in the URL. Callers must never pass credentials, cookies, or full
+ * account payloads — see the DEBUG_LOGGING declaration above.
+ * @param {string} label
+ * @param {object} [data]
+ */
+function debugLog(label, data) {
+  if (!DEBUG_LOGGING) {
+    return;
+  }
+  if (data === undefined) {
+    console.log(`[Accessible Seerr] ${label}`);
+  } else {
+    console.log(`[Accessible Seerr] ${label}`, data);
+  }
+}
+
+/** Keys that must never reach the console, even in debug mode. */
+const SENSITIVE_BODY_KEYS = Object.freeze(["password", "cookie", "token", "apiKey", "authorization"]);
+
+/**
+ * Shallow-copy a request/response body for logging, replacing any sensitive
+ * field values with a fixed placeholder rather than omitting the key, so the
+ * shape of the payload stays visible for debugging.
+ * @param {*} body
+ * @returns {*}
+ */
+function redactSensitiveFields(body) {
+  if (!body || typeof body !== "object") {
+    return body;
+  }
+  const redacted = { ...body };
+  for (const key of Object.keys(redacted)) {
+    if (SENSITIVE_BODY_KEYS.includes(key.toLowerCase())) {
+      redacted[key] = "[redacted]";
+    }
+  }
+  return redacted;
+}
+
+/**
  * Reusable Seerr API request helper. Always same-origin, always credentialed.
  * Never accepts an absolute URL — every path must be root-relative.
  *
@@ -253,6 +303,11 @@ async function apiRequest(path, options = {}) {
     body = JSON.stringify(options.body);
   }
 
+  debugLog(
+    `Request: ${method} ${path}`,
+    options.body !== undefined ? { body: redactSensitiveFields(options.body) } : undefined
+  );
+
   let response;
   try {
     response = await fetch(path, {
@@ -262,8 +317,11 @@ async function apiRequest(path, options = {}) {
       credentials: "include"
     });
   } catch (networkFailure) {
+    debugLog(`Network failure: ${method} ${path}`);
     throw new NetworkError();
   }
+
+  debugLog(`Response: ${method} ${path} -> ${response.status}`);
 
   const contentType = response.headers.get("content-type") || "";
   const isJson = contentType.includes("application/json");
@@ -830,7 +888,28 @@ function buildTelevisionRequestPayload(details, selectedSeasons) {
  * @returns {Promise<*>}
  */
 async function submitMediaRequest(payload) {
-  return apiRequest(API_PATHS.requests, { method: "POST", body: payload });
+  const result = await apiRequest(API_PATHS.requests, { method: "POST", body: payload });
+
+  // Diagnostic only (enabled via ?debug=1): if a request never reaches
+  // Sonarr/Radarr, the cause is almost always on Seerr's side rather than
+  // in this frontend, since this project never talks to Sonarr/Radarr
+  // directly. The two most common causes are (1) the request landing in
+  // "Pending Approval" and waiting on a Seerr admin, or (2) Seerr itself
+  // failing to hand the approved request to Sonarr/Radarr, which only
+  // appears in Seerr's own server logs. This log shows what Seerr reported
+  // back immediately after accepting the request, without exposing any
+  // account data beyond the request/media status.
+  debugLog("Request created", {
+    requestId: result && result.id,
+    requestStatus: result && result.status,
+    mediaId: result && result.media && result.media.id,
+    mediaStatus: result && result.media && result.media.status,
+    seasons: Array.isArray(result && result.seasons)
+      ? result.seasons.map((season) => season && season.seasonNumber)
+      : undefined
+  });
+
+  return result;
 }
 
 /**

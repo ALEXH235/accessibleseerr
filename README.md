@@ -346,6 +346,32 @@ intentionally filtered out.
 **Seerr response-shape differences**
 See [Updating API mappings](#updating-api-mappings) above.
 
+**Request succeeds in Accessible Seerr but nothing appears in Sonarr/Radarr**
+Accessible Seerr's job ends the moment `POST /api/v1/request` returns
+successfully — everything after that (approval, and handing the request
+to Sonarr/Radarr) happens inside Seerr itself, which this project never
+talks to directly. Load the app with `?debug=1` (see
+[Browser developer tools](#browser-developer-tools)) and submit the
+request again; the console will show the exact payload sent and the
+`requestStatus`/`mediaStatus` Seerr returned. From there:
+
+- `requestStatus` of `1` means **Pending Approval** — the request is
+  sitting in Seerr waiting for an admin (or you, if you have permission)
+  to approve it in the normal Seerr UI. It will not reach Sonarr until
+  approved.
+- If the request shows as approved/processing in Seerr's own UI but still
+  never appears in Sonarr, the failure is happening inside Seerr's
+  Sonarr integration (wrong API key, unreachable Sonarr URL, no default
+  quality profile/root folder configured, etc.) — check Seerr's own
+  container logs (`docker logs <your-seerr-container>`), not this
+  project's frontend or `accessible-seerr` container's logs. The
+  `accessible-seerr` container never sees `/api/v1/request` traffic in
+  the recommended deployment, since the browser sends it same-origin
+  directly to Seerr.
+- If `mediaId` in the debug log looks wrong (not a TMDB id), check
+  `getMediaIdentifier()` in `public/app.js` against the shape your Seerr
+  version returns from `/api/v1/movie/{id}` or `/api/v1/tv/{id}`.
+
 **Logout endpoint mismatch**
 If your Seerr fork responds differently to `/api/v1/auth/logout`, local
 UI state is still cleared, but the user will be told that server-side
@@ -395,6 +421,14 @@ To fix this, either:
 
 When diagnosing an issue:
 
+- **Diagnostic logging:** load the app with `?debug=1` appended to the URL
+  (e.g. `https://YOUR_DOMAIN/ACCESSIBLE_PATH/?debug=1`) to enable console
+  logging of every API call this frontend makes: method, path, response
+  status, and — for request submission specifically — the created
+  request's id/status and the affected media's id/status. Passwords,
+  cookies, and full account payloads are never logged, even in this mode.
+  This is implemented in `debugLog()` / `redactSensitiveFields()` near the
+  top of `public/app.js`.
 - **Network tab:** inspect request URLs, status codes, and response JSON
   for `/api/v1/...` calls
 - **Console:** check for CSP violation messages, which name the exact
