@@ -13,6 +13,13 @@
 # TLS is NOT configured here. Add your own ssl_certificate directives,
 # or let a certificate manager (certbot, acme.sh, your host panel) inject
 # them, at the location marked below.
+#
+# IMPORTANT: "accessible-seerr" and "${SEERR_CONTAINER}" below are Docker
+# DNS names. This config only resolves them if THIS Nginx itself runs as a
+# container attached to the same external ${DOCKER_NETWORK}. If you run
+# Nginx directly on the host instead, replace those proxy_pass targets
+# with a published loopback port (e.g. 127.0.0.1:8084) — see "502 Bad
+# Gateway from a host-installed reverse proxy" in README.md.
 
 server {
     listen 443 ssl;

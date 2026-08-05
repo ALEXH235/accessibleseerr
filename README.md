@@ -22,7 +22,8 @@ any of that.
 
 ## Features
 
-- Sign in with your existing Seerr **local account** (email + password)
+- Sign in with your **Jellyfin account** (username + password), via Seerr's
+  own Jellyfin authentication endpoint
 - Reuses an existing Seerr session automatically — no repeated logins
 - Accessible search results with real, spoken media titles
 - Movie details: overview, genres, runtime, availability
@@ -111,8 +112,8 @@ accessible-seerr/
 
 ## Prerequisites
 
-- An existing, already-configured Seerr instance (Overseerr, Jellyseerr, or
-  a compatible fork) with at least one local account
+- An existing, already-configured Jellyseerr instance (or a compatible fork
+  that exposes `/api/v1/auth/jellyfin`), connected to your Jellyfin server
 - An existing HTTPS reverse proxy (Nginx, Caddy, Traefik, Nginx Proxy
   Manager, Apache, or similar) already serving Seerr
 - Docker and Docker Compose
@@ -221,7 +222,11 @@ Key points:
 
 ## Authentication explanation
 
-- `POST /api/v1/auth/local` — signs in with `{ "email": "...", "password": "..." }`
+- `POST /api/v1/auth/jellyfin` — signs in with
+  `{ "username": "...", "password": "..." }`. Seerr forwards these
+  credentials to the Jellyfin server it is configured against and, on
+  success, starts a normal Seerr session — this project never contacts
+  Jellyfin directly
 - `GET /api/v1/auth/me` — checks whether a valid session already exists
 - Every authenticated request is sent with `credentials: "include"`, so
   the browser attaches Seerr's own session cookie automatically
@@ -236,7 +241,7 @@ Key points:
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/v1/auth/me` | Check for an existing session |
-| `POST` | `/api/v1/auth/local` | Sign in with a local account |
+| `POST` | `/api/v1/auth/jellyfin` | Sign in with a Jellyfin account |
 | `POST` (falls back to `GET`) | `/api/v1/auth/logout` | Sign out |
 | `GET` | `/api/v1/search` | Search movies and television series |
 | `GET` | `/api/v1/movie/{id}` | Movie details |
@@ -356,6 +361,36 @@ Ensure your reverse proxy redirects HTTP to HTTPS and that no absolute
 and root-relative URLs, so this typically indicates a proxy
 misconfiguration).
 
+**502 Bad Gateway from a host-installed reverse proxy**
+The bundled templates (`templates/nginx-site.conf.template`,
+`templates/caddyfile.template`) proxy to `accessible-seerr:80` and
+`${SEERR_CONTAINER}:${SEERR_PORT}`. Those are **Docker-internal DNS
+names** — they only resolve for other containers attached to the same
+`DOCKER_NETWORK`. If your reverse proxy (Nginx, Caddy, Apache, ...) runs
+directly on the host instead of inside a container on that network, it
+cannot resolve those names and every request to `${ACCESSIBLE_PATH}/`
+will 502, even though `docker ps` shows `accessible-seerr` as healthy.
+
+To fix this, either:
+
+* Run your reverse proxy in Docker, attached to the same external
+  `DOCKER_NETWORK` as `accessible-seerr` and Seerr, and use the
+  generated templates unmodified; or
+* Keep your reverse proxy on the host and publish a loopback-only port
+  for `accessible-seerr` instead. In `docker-compose.yml`:
+
+  ```yaml
+      ports:
+        - "127.0.0.1:8084:80"
+  ```
+
+  Then point your host reverse proxy at `127.0.0.1:8084` instead of
+  `accessible-seerr:80` (and, if Seerr itself is also only reachable by
+  Docker service name, do the same for `${SEERR_CONTAINER}:${SEERR_PORT}`).
+  Do not bind this port to `0.0.0.0` — that would expose the frontend
+  container outside the host without a TLS-terminating proxy in front
+  of it.
+
 ## Browser developer tools
 
 When diagnosing an issue:
@@ -372,7 +407,7 @@ Before sharing screenshots, HAR files, or console output publicly,
 **redact**:
 
 - Cookie values
-- Account email addresses or display names
+- Account usernames, email addresses, or display names
 - Your real domain name
 - Internal Docker service/container names
 - Any request or response body containing account-specific data
@@ -383,8 +418,8 @@ Before sharing screenshots, HAR files, or console output publicly,
   beyond Next/Previous navigation on the current page is not implemented
   beyond what Seerr's own pagination metadata provides
 - Person search results are intentionally not displayed
-- Local Seerr accounts only — this version does not implement Plex OAuth
-  or other external sign-in methods
+- Jellyfin sign-in only — this version does not implement local Seerr
+  accounts, Plex OAuth, or other external sign-in methods
 - Optional per-request settings (server selection, quality profile, root
   folder, language profile, tags, 4K) are not exposed; Seerr's configured
   defaults are used
@@ -436,9 +471,9 @@ any media managed by Sonarr/Radarr/Jellyfin/Plex.
 - [ ] HTTPS works end-to-end
 
 ### Authentication
-- [ ] Valid local login
+- [ ] Valid Jellyfin login
 - [ ] Invalid login shows a generic failure message
-- [ ] Empty email is rejected client-side with a field-level message
+- [ ] Empty username is rejected client-side with a field-level message
 - [ ] Empty password is rejected client-side with a field-level message
 - [ ] Existing authenticated session is detected on load
 - [ ] Session expiration mid-use returns the user to sign-in with an announcement

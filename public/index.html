@@ -23,20 +23,20 @@
 
     <section id="sign-in-section" aria-labelledby="sign-in-heading">
       <h2 id="sign-in-heading">Sign in</h2>
-      <p>Sign in with your existing Seerr local account email address and password.</p>
+      <p>Sign in with your Jellyfin account username and password.</p>
 
       <form id="login-form" novalidate>
         <div class="form-field">
-          <label for="login-email">Email address</label>
+          <label for="login-username">Jellyfin username</label>
           <input
-            id="login-email"
-            name="email"
-            type="email"
+            id="login-username"
+            name="username"
+            type="text"
             autocomplete="username"
-            aria-describedby="login-email-error"
+            aria-describedby="login-username-error"
             required
           >
-          <p id="login-email-error" class="field-error" hidden></p>
+          <p id="login-username-error" class="field-error" hidden></p>
         </div>
 
         <div class="form-field">

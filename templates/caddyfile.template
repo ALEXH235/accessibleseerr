@@ -19,6 +19,13 @@
 # frontend. Bookmark or link to ${ACCESSIBLE_PATH}/ (with the trailing
 # slash) to avoid this. Adding an explicit redirect for the exact path is
 # shown commented out below if you prefer that behavior.
+#
+# IMPORTANT: "accessible-seerr" and "${SEERR_CONTAINER}" below are Docker
+# DNS names. This config only resolves them if THIS Caddy instance itself
+# runs as a container attached to the same external ${DOCKER_NETWORK}. If
+# you run Caddy directly on the host instead, replace those reverse_proxy
+# targets with a published loopback port (e.g. 127.0.0.1:8084) — see "502
+# Bad Gateway from a host-installed reverse proxy" in README.md.
 
 ${PUBLIC_DOMAIN} {
     # redir ${ACCESSIBLE_PATH} ${ACCESSIBLE_PATH}/ permanent

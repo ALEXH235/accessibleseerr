@@ -22,7 +22,15 @@ services:
     # it bypasses the same-origin session-cookie deployment model described
     # in the README.
     # ports:
-    #   - "8080:80"
+    #   - "8084:80"
+    #
+    # If your reverse proxy runs on the host instead of inside Docker, it
+    # cannot resolve the "accessible-seerr" Docker DNS name used by the
+    # bundled templates. In that case, bind a loopback-only port instead
+    # and point the host proxy at it (see "502 Bad Gateway from a
+    # host-installed reverse proxy" in the README):
+    # ports:
+    #   - "127.0.0.1:8084:80"
 
 networks:
   shared:

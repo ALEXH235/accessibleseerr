@@ -39,7 +39,7 @@
  */
 const API_PATHS = Object.freeze({
   currentUser: "/api/v1/auth/me",
-  localLogin: "/api/v1/auth/local",
+  jellyfinLogin: "/api/v1/auth/jellyfin",
   logout: "/api/v1/auth/logout",
   search: "/api/v1/search",
   movieDetails: "/api/v1/movie",
@@ -81,9 +81,9 @@ const dom = {
 
   signInSection: document.getElementById("sign-in-section"),
   loginForm: document.getElementById("login-form"),
-  loginEmail: document.getElementById("login-email"),
+  loginUsername: document.getElementById("login-username"),
   loginPassword: document.getElementById("login-password"),
-  loginEmailError: document.getElementById("login-email-error"),
+  loginUsernameError: document.getElementById("login-username-error"),
   loginPasswordError: document.getElementById("login-password-error"),
   loginSubmit: document.getElementById("login-submit"),
 
@@ -316,8 +316,8 @@ async function apiRequest(path, options = {}) {
 /**
  * Check whether a valid Seerr session already exists.
  * Adapter note: some Seerr versions may return a slightly different user
- * shape from /api/v1/auth/me. This function only reads `id`, `email`, and
- * `displayName`, all of which are widely supported.
+ * shape from /api/v1/auth/me. This function only reads `id`, `username`,
+ * `email`, and `displayName`, all of which are widely supported.
  */
 async function checkCurrentSession() {
   try {
@@ -334,14 +334,17 @@ async function checkCurrentSession() {
 }
 
 /**
- * Sign in using a Seerr local account.
- * @param {string} email
+ * Sign in using a Jellyfin account, authenticated through Seerr's own
+ * Jellyfin adapter endpoint. Seerr forwards the credentials to the Jellyfin
+ * server it is configured against and, on success, starts a normal Seerr
+ * session cookie — this project never talks to Jellyfin directly.
+ * @param {string} username
  * @param {string} password
  */
-async function loginToSeerr(email, password) {
-  return apiRequest(API_PATHS.localLogin, {
+async function loginToSeerr(username, password) {
+  return apiRequest(API_PATHS.jellyfinLogin, {
     method: "POST",
-    body: { email, password }
+    body: { username, password }
   });
 }
 
@@ -1205,7 +1208,7 @@ function showLoginView({ announceExpired }) {
   if (announceExpired) {
     announceStatus("Your session has expired. Please sign in again.");
   }
-  moveFocusTo(dom.loginEmail);
+  moveFocusTo(dom.loginUsername);
 }
 
 function showAuthenticatedHomeView({ moveFocus }) {
@@ -1215,10 +1218,13 @@ function showAuthenticatedHomeView({ moveFocus }) {
   dom.detailsSection.hidden = true;
   dom.resultsSection.hidden = state.searchResults.length === 0;
 
+  const username =
+    state.currentUser && typeof state.currentUser.username === "string" ? state.currentUser.username : null;
   const email = state.currentUser && typeof state.currentUser.email === "string" ? state.currentUser.email : null;
   const displayName =
     state.currentUser && typeof state.currentUser.displayName === "string" ? state.currentUser.displayName : null;
-  dom.accountStatus.textContent = displayName || email ? `Signed in as ${displayName || email}.` : "Signed in.";
+  const accountLabel = displayName || username || email;
+  dom.accountStatus.textContent = accountLabel ? `Signed in as ${accountLabel}.` : "Signed in.";
 
   if (moveFocus) {
     moveFocusTo(dom.searchInput);
@@ -1265,16 +1271,16 @@ dom.loginForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  clearFieldError(dom.loginEmail, dom.loginEmailError);
+  clearFieldError(dom.loginUsername, dom.loginUsernameError);
   clearFieldError(dom.loginPassword, dom.loginPasswordError);
   clearError();
 
-  const email = dom.loginEmail.value.trim();
+  const username = dom.loginUsername.value.trim();
   const password = dom.loginPassword.value;
 
   let hasValidationError = false;
-  if (email === "") {
-    setFieldError(dom.loginEmail, dom.loginEmailError, "Enter your email address.");
+  if (username === "") {
+    setFieldError(dom.loginUsername, dom.loginUsernameError, "Enter your Jellyfin username.");
     hasValidationError = true;
   }
   if (password === "") {
@@ -1282,7 +1288,7 @@ dom.loginForm.addEventListener("submit", async (event) => {
     hasValidationError = true;
   }
   if (hasValidationError) {
-    moveFocusTo(email === "" ? dom.loginEmail : dom.loginPassword);
+    moveFocusTo(username === "" ? dom.loginUsername : dom.loginPassword);
     return;
   }
 
@@ -1292,7 +1298,7 @@ dom.loginForm.addEventListener("submit", async (event) => {
   announceStatus("Signing in.");
 
   try {
-    const user = await loginToSeerr(email, password);
+    const user = await loginToSeerr(username, password);
     dom.loginPassword.value = "";
     applyAuthenticatedState(user || {});
     showAuthenticatedHomeView({ moveFocus: true });
@@ -1300,13 +1306,13 @@ dom.loginForm.addEventListener("submit", async (event) => {
   } catch (error) {
     dom.loginPassword.value = "";
     if (error instanceof AuthenticationError || error instanceof PermissionError) {
-      showError("Sign-in failed. Check your email address and password.", { focus: false });
+      showError("Sign-in failed. Check your Jellyfin username and password.", { focus: false });
     } else if (error instanceof NetworkError) {
       showError(error.message, { focus: false });
     } else {
       showError("Sign-in failed. Please try again.", { focus: false });
     }
-    moveFocusTo(dom.loginEmail);
+    moveFocusTo(dom.loginUsername);
   } finally {
     state.loginInProgress = false;
     dom.loginSubmit.disabled = false;
