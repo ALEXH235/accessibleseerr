@@ -1,0 +1,37 @@
+# Local deployment configuration
+.env
+.env.*
+!.env.example
+docker-compose.override.yml
+
+# Generated deployment files
+generated/*
+!generated/.gitkeep
+
+# Local reverse-proxy configuration
+nginx.local.conf
+caddy.local.conf
+traefik.local.yml
+
+# Certificates and keys
+certificates/
+certs/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local notes and backups
+*.local
+*.bak
+*.backup
+*.swp
+*~
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/

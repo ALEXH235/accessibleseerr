@@ -1,0 +1,114 @@
+# Nginx Proxy Manager setup — Accessible Seerr
+
+This guide was generated from your local `.env` file by `scripts/configure.sh`.
+It walks through configuring Nginx Proxy Manager (NPM) to serve both Seerr
+and Accessible Seerr from the same HTTPS hostname.
+
+Nginx Proxy Manager's UI labels have changed across releases. If a label
+below does not match exactly what you see, look for the nearest equivalent
+field — the underlying Nginx directives are the same.
+
+Your configured values:
+
+- Public hostname: `${PUBLIC_DOMAIN}`
+- Accessible frontend path: `${ACCESSIBLE_PATH}`
+- Seerr container/service name: `${SEERR_CONTAINER}`
+- Seerr internal port: `${SEERR_PORT}`
+- Accessible Seerr container name: `accessible-seerr` (port 80 internally)
+
+## 1. Create the main Seerr proxy host
+
+1. In NPM, go to **Hosts → Proxy Hosts → Add Proxy Host**.
+2. **Domain Names**: `${PUBLIC_DOMAIN}`
+3. **Scheme**: `http`
+4. **Forward Hostname / IP**: `${SEERR_CONTAINER}`
+5. **Forward Port**: `${SEERR_PORT}`
+6. Enable **Block Common Exploits** (or the closest equivalent option).
+7. Enable **Websockets Support** — Seerr's own interface relies on this.
+
+## 2. Enable SSL
+
+1. Open the **SSL** tab on the same proxy host.
+2. **SSL Certificate**: request a new certificate (Let's Encrypt) or select
+   an existing one covering `${PUBLIC_DOMAIN}`.
+3. Enable **Force SSL** so plain HTTP requests are redirected to HTTPS.
+4. Enable **HTTP/2 Support** if you want it; it is optional.
+5. Save the host.
+
+## 3. Add the `/api/` route
+
+Seerr's API must remain reachable at `/api/` on the same origin so the
+browser can reuse Seerr's session cookie for both the normal Seerr
+interface and Accessible Seerr.
+
+1. Open the **Custom Locations** section of the proxy host (or **Advanced**
+   tab, depending on your NPM version).
+2. Add a location:
+   - **Location**: `/api/`
+   - **Scheme**: `http`
+   - **Forward Hostname / IP**: `${SEERR_CONTAINER}`
+   - **Forward Port**: `${SEERR_PORT}`
+3. If your NPM version does not expose a Custom Locations UI, use the
+   **Advanced** tab's raw Nginx configuration box and add:
+
+   ```nginx
+   location ^~ /api/ {
+       proxy_pass http://${SEERR_CONTAINER}:${SEERR_PORT};
+       proxy_set_header Host $host;
+       proxy_set_header X-Real-IP $remote_addr;
+       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+       proxy_set_header X-Forwarded-Proto $scheme;
+   }
+   ```
+
+## 4. Add the accessible frontend route
+
+1. In the same **Custom Locations** / **Advanced** section, add a second
+   location for the accessible frontend path:
+   - **Location**: `${ACCESSIBLE_PATH}/`
+   - **Scheme**: `http`
+   - **Forward Hostname / IP**: `accessible-seerr`
+   - **Forward Port**: `80`
+2. If using the raw Nginx configuration box instead:
+
+   ```nginx
+   location = ${ACCESSIBLE_PATH} {
+       return 301 ${ACCESSIBLE_PATH}/;
+   }
+
+   location ^~ ${ACCESSIBLE_PATH}/ {
+       proxy_pass http://accessible-seerr:80/;
+       proxy_set_header Host $host;
+       proxy_set_header X-Real-IP $remote_addr;
+       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+       proxy_set_header X-Forwarded-Proto $scheme;
+   }
+   ```
+
+   The trailing slash after `accessible-seerr:80/` strips the
+   `${ACCESSIBLE_PATH}` prefix before forwarding to the static container —
+   keep it exactly as shown.
+
+3. Make sure this location is evaluated with higher priority than the
+   catch-all `/` route to Seerr. The `^~` prefix in the raw configuration
+   examples above ensures this; if NPM orders Custom Locations by list
+   order in your version, place the `${ACCESSIBLE_PATH}/` and `/api/`
+   entries above any catch-all entry.
+
+## 5. Verify
+
+After saving:
+
+- `https://${PUBLIC_DOMAIN}/` should show the normal Seerr interface.
+- `https://${PUBLIC_DOMAIN}${ACCESSIBLE_PATH}/` should show Accessible Seerr.
+- `https://${PUBLIC_DOMAIN}/api/v1/status` (or a similar Seerr API path)
+  should return a JSON response, not the accessible frontend's HTML.
+
+## Notes
+
+- `${PUBLIC_DOMAIN}` and internal container names above are local
+  configuration only. This generated file is ignored by Git — do not paste
+  its contents into a public issue or forum post without redacting your
+  hostname and internal service names.
+- Accessible Seerr and Seerr must be reachable on the same Docker network
+  as Nginx Proxy Manager for the forward hostnames above to resolve.

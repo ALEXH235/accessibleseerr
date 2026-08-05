@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+.env.*
+generated
+templates
+scripts
+README.md
+CLAUDE.md
+docker-compose.yml
+certificates
+certs
+*.pem
+*.key

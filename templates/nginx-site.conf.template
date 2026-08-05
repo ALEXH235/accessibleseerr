@@ -1,0 +1,70 @@
+# Accessible Seerr — generated Nginx reverse-proxy site configuration.
+#
+# This file is a TEMPLATE. Placeholders like ${PUBLIC_DOMAIN} are replaced
+# by scripts/configure.sh using the values in your local .env file. Do not
+# edit the rendered copy in generated/nginx-site.conf directly if you plan
+# to re-run the configuration script later — edit .env instead.
+#
+# Routing model:
+#   ${ACCESSIBLE_PATH}/  -> accessible-seerr static frontend container
+#   /api/                -> Seerr container (same API used by Seerr itself)
+#   /                     -> Seerr container (the normal Seerr interface)
+#
+# TLS is NOT configured here. Add your own ssl_certificate directives,
+# or let a certificate manager (certbot, acme.sh, your host panel) inject
+# them, at the location marked below.
+
+server {
+    listen 443 ssl;
+    server_name ${PUBLIC_DOMAIN};
+
+    # ---- TLS configuration ----
+    # Add your certificate directives here. Do not commit real certificate
+    # paths to version control.
+    # ssl_certificate /path/to/fullchain.pem;
+    # ssl_certificate_key /path/to/private-key.pem;
+
+    location = ${ACCESSIBLE_PATH} {
+        return 301 ${ACCESSIBLE_PATH}/;
+    }
+
+    # Trailing slash on proxy_pass strips the ${ACCESSIBLE_PATH} prefix
+    # before forwarding to the static frontend container, so the container
+    # always sees paths relative to "/".
+    location ^~ ${ACCESSIBLE_PATH}/ {
+        proxy_pass http://accessible-seerr:80/;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location ^~ /api/ {
+        proxy_pass http://${SEERR_CONTAINER}:${SEERR_PORT};
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        proxy_pass http://${SEERR_CONTAINER}:${SEERR_PORT};
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+
+server {
+    listen 80;
+    server_name ${PUBLIC_DOMAIN};
+    return 301 https://$host$request_uri;
+}

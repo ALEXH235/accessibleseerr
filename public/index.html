@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Accessible Seerr — Screen-reader-friendly media requests</title>
+  <meta name="description" content="An accessible, screen-reader-friendly client for searching, reviewing, and requesting media through an existing Seerr instance.">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <header class="site-header">
+    <h1>Accessible Seerr</h1>
+    <p class="site-tagline">An accessible client for your Seerr instance.</p>
+  </header>
+
+  <div id="status-region" role="status" aria-live="polite" aria-atomic="true" class="visually-hidden"></div>
+  <div id="error-region" role="alert" aria-live="assertive" aria-atomic="true" class="error-region" hidden></div>
+
+  <main id="main-content">
+
+    <section id="sign-in-section" aria-labelledby="sign-in-heading">
+      <h2 id="sign-in-heading">Sign in</h2>
+      <p>Sign in with your existing Seerr local account email address and password.</p>
+
+      <form id="login-form" novalidate>
+        <div class="form-field">
+          <label for="login-email">Email address</label>
+          <input
+            id="login-email"
+            name="email"
+            type="email"
+            autocomplete="username"
+            aria-describedby="login-email-error"
+            required
+          >
+          <p id="login-email-error" class="field-error" hidden></p>
+        </div>
+
+        <div class="form-field">
+          <label for="login-password">Password</label>
+          <input
+            id="login-password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            aria-describedby="login-password-error"
+            required
+          >
+          <p id="login-password-error" class="field-error" hidden></p>
+        </div>
+
+        <button type="submit" id="login-submit">Sign in</button>
+      </form>
+    </section>
+
+    <section id="account-section" aria-labelledby="account-heading" hidden>
+      <h2 id="account-heading" class="visually-hidden">Account</h2>
+      <p id="account-status"></p>
+      <button type="button" id="logout-button">Sign out</button>
+    </section>
+
+    <section id="search-section" aria-labelledby="search-heading" hidden>
+      <h2 id="search-heading">Search</h2>
+
+      <form id="search-form">
+        <div class="form-field">
+          <label for="search-input">Search movies and television series</label>
+          <input
+            id="search-input"
+            name="query"
+            type="search"
+            autocomplete="off"
+          >
+        </div>
+
+        <div class="button-row">
+          <button type="submit" id="search-submit">Search</button>
+          <button type="button" id="search-clear">Clear search</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="results-section" aria-labelledby="results-heading" hidden>
+      <h2 id="results-heading">Search results</h2>
+      <p id="results-summary" class="results-summary"></p>
+
+      <ul id="results-list" class="results-list"></ul>
+
+      <nav id="results-pagination" class="pagination" aria-label="Search results pages" hidden>
+        <button type="button" id="results-prev-page">Previous page</button>
+        <span id="results-page-status" class="pagination-status"></span>
+        <button type="button" id="results-next-page">Next page</button>
+      </nav>
+    </section>
+
+    <section id="details-section" aria-labelledby="details-heading" hidden>
+      <button type="button" id="details-back">Back to results</button>
+
+      <h2 id="details-heading">Media details</h2>
+
+      <p id="details-loading" hidden>Loading details…</p>
+
+      <div id="details-content" hidden>
+        <dl id="details-list" class="details-list"></dl>
+        <div id="request-section"></div>
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>

@@ -1,0 +1,30 @@
+# Accessible Seerr — static frontend service only.
+#
+# This container is not published to a public port by default. It is meant
+# to sit behind your existing HTTPS reverse proxy (Nginx, Caddy, Traefik,
+# Nginx Proxy Manager, Apache, ...) on the same Docker network as Seerr.
+#
+# PUBLIC_DOMAIN is intentionally NOT referenced anywhere in this file. The
+# static frontend does not need to know its own domain; only your reverse
+# proxy configuration (see templates/ and generated/) needs that value.
+
+services:
+  accessible-seerr:
+    build: .
+    container_name: accessible-seerr
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - shared
+    # Optional local testing only (uncomment to browse the container
+    # directly without a reverse proxy). Do not enable this in production;
+    # it bypasses the same-origin session-cookie deployment model described
+    # in the README.
+    # ports:
+    #   - "8080:80"
+
+networks:
+  shared:
+    name: "${DOCKER_NETWORK}"
+    external: true

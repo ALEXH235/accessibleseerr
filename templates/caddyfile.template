@@ -1,0 +1,37 @@
+# Accessible Seerr — generated Caddyfile.
+#
+# This file is a TEMPLATE rendered by scripts/configure.sh using the values
+# in your local .env file. Re-run the script after changing .env rather
+# than hand-editing generated/Caddyfile.
+#
+# Caddy can usually obtain and renew HTTPS certificates automatically once
+# ${PUBLIC_DOMAIN} resolves to this host and ports 80/443 are reachable.
+# No manual certificate configuration is required in the common case.
+#
+# Routing model matches templates/nginx-site.conf.template:
+#   ${ACCESSIBLE_PATH}/* -> accessible-seerr static frontend container
+#   /api/*                -> Seerr container
+#   everything else        -> Seerr container (the normal Seerr interface)
+#
+# Note on the path without a trailing slash: a request to exactly
+# ${ACCESSIBLE_PATH} (no trailing slash) falls through to the final
+# `handle` block below and is proxied to Seerr, not to the accessible
+# frontend. Bookmark or link to ${ACCESSIBLE_PATH}/ (with the trailing
+# slash) to avoid this. Adding an explicit redirect for the exact path is
+# shown commented out below if you prefer that behavior.
+
+${PUBLIC_DOMAIN} {
+    # redir ${ACCESSIBLE_PATH} ${ACCESSIBLE_PATH}/ permanent
+
+    handle_path ${ACCESSIBLE_PATH}/* {
+        reverse_proxy accessible-seerr:80
+    }
+
+    handle /api/* {
+        reverse_proxy ${SEERR_CONTAINER}:${SEERR_PORT}
+    }
+
+    handle {
+        reverse_proxy ${SEERR_CONTAINER}:${SEERR_PORT}
+    }
+}
